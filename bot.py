@@ -26,8 +26,6 @@ if not os.path.exists(OUTPUT_DIR):
 # Change working directory to the directory of OUTPUT_DIR
 os.chdir(OUTPUT_DIR)
 
-oldterm = os.environ['TERM']
-os.environ['TERM'] = 'dummy'
 shell = replwrap.REPLWrapper(HANB_CMD, "hanb>", None)
 
 
@@ -107,6 +105,3 @@ async def onConnect(bot: IrcBot):
 if __name__ == "__main__":
     bot = IrcBot(SERVER, PORT, NICK, use_ssl=SSL)
     bot.runWithCallback(onConnect)
-
-
-os.environ['TERM'] = oldterm
