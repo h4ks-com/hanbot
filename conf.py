@@ -1,6 +1,6 @@
-SERVER="irc.dot.org.es"
-PORT=6697
-SSL=True
+SERVER="host.docker.internal"
+PORT=6667
+SSL=False
 NICK="_hanbot"
 CHANNELS=["#bots"]
 PREFIX=r"\|"
