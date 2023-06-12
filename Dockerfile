@@ -15,7 +15,7 @@ RUN git clone https://github.com/matheusfillipe/hanb.git hanb_master && \
     cd /hanb && \
     cargo build --release && \
     cp target/release/hanb /hanb && \
-    cargo clean --release
+    cargo clean --release #redo
 
 WORKDIR /hanbbot
 ENV HANB_CMD=/hanb/hanb

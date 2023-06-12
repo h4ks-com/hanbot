@@ -81,8 +81,7 @@ async def onConnect(bot: IrcBot):
         await bot.send_message(channel=channel, message=list(shell.child.before.split("\n")))
 
     async def update_loop():
-        """Update cache to eliminate invalid keys and monitor
-        COQ_EXPORT_DIR."""
+        """Update cache to eliminate invalid keys and monitor"""
         while True:
             for file in Path("./").glob("*"):
                 info(f"Found {file=}")
