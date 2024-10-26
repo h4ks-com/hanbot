@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import re
@@ -23,12 +22,12 @@ def remove_surrounding_quotes(text: str) -> str:
 
 
 HOST = os.getenv("HOST")
-assert HOST, "IRC_HOST is required"
+assert HOST, "HOST is required"
 PORT = int(os.getenv("PORT") or 6667)
 SSL = os.getenv("SSL", "").lower() == "true"
 NICK = os.getenv("NICK") or "caibot"
 PREFIX = os.getenv("PREFIX", ">")
-CHANNELS = json.loads(remove_surrounding_quotes(os.getenv("CHANNELS") or "[]"))
+CHANNELS = remove_surrounding_quotes(os.getenv("CHANNELS", "")).split(",")
 HANB_CMD = os.getenv("HANB_CMD") or "hanb"
 HANB_CMD = os.environ.get("HANB_CMD", HANB_CMD)
 
