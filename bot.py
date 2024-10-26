@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 from pathlib import Path
@@ -31,7 +32,7 @@ CHANNELS = json.loads(remove_surrounding_quotes(os.getenv("CHANNELS") or "[]"))
 HANB_CMD = os.getenv("HANB_CMD") or "hanb"
 HANB_CMD = os.environ.get("HANB_CMD", HANB_CMD)
 
-utils.setLogging(10)
+utils.setLogging(logging.INFO)
 utils.setParseOrderTopBottom(True)
 utils.setPrefix(PREFIX)
 
