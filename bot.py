@@ -1,14 +1,34 @@
+import json
 import os
 import re
 from pathlib import Path
-from pexpect import replwrap
 
 import requests
 import trio
+from dotenv import load_dotenv
 from IrcBot.bot import IrcBot, Message, utils
+from pexpect import replwrap
 
-from conf import CHANNELS, NICK, PORT, PREFIX, SERVER, SSL, HANB_CMD
+from shell_convert import convert_ansi_to_irc
 
+load_dotenv()
+
+
+def remove_surrounding_quotes(text: str) -> str:
+    text = text.strip()
+    if (text.startswith('"') and text.endswith('"')) or (text.startswith("'") and text.endswith("'")):
+        return text[1:-1]
+    return text
+
+
+HOST = os.getenv("HOST")
+assert HOST, "IRC_HOST is required"
+PORT = int(os.getenv("PORT") or 6667)
+SSL = os.getenv("SSL", "").lower() == "true"
+NICK = os.getenv("NICK") or "caibot"
+PREFIX = os.getenv("PREFIX", ">")
+CHANNELS = json.loads(remove_surrounding_quotes(os.getenv("CHANNELS") or "[]"))
+HANB_CMD = os.getenv("HANB_CMD") or "hanb"
 HANB_CMD = os.environ.get("HANB_CMD", HANB_CMD)
 
 utils.setLogging(10)
@@ -49,17 +69,20 @@ def read_paste(url):
 
 
 def run_command(text: str):
-    return list(shell.run_command(text, timeout=10).split("\n"))
+    return [convert_ansi_to_irc(m) for m in list(shell.run_command(text, timeout=10).split("\n"))]
 
-@utils.regex_cmd_with_messsage(fr"^{PREFIX}(.+)$")
+
+@utils.regex_cmd_with_messsage(rf"^{PREFIX}(.+)$")
 async def run(bot: IrcBot, match: re.Match, message: Message):
     text = match.group(1).strip()
     return run_command(text)
 
-@utils.regex_cmd_with_messsage(fr"^{PREFIX}\s*help(.*)$")
+
+@utils.regex_cmd_with_messsage(rf"^{PREFIX}\s*help(.*)$")
 async def run_help(bot: IrcBot, match: re.Match, message: Message):
     text = "help" + (match.group(1).strip() or "")
     return run_command(text)
+
 
 @utils.arg_command("read", "Populates your environment code with code from url")
 async def readurl(bot: IrcBot, args: re.Match, msg: Message):
@@ -69,7 +92,7 @@ async def readurl(bot: IrcBot, args: re.Match, msg: Message):
         run_command(read_paste(args[1]))
         return "Code has been evaluated but i am not going to spam the channel"
     except Exception as e:
-        return(msg, "Failed to read paste: " + str(e))
+        return (msg, "Failed to read paste: " + str(e))
 
 
 async def onConnect(bot: IrcBot):
@@ -102,5 +125,5 @@ async def onConnect(bot: IrcBot):
 
 
 if __name__ == "__main__":
-    bot = IrcBot(SERVER, PORT, NICK, use_ssl=SSL)
+    bot = IrcBot(HOST, PORT, NICK, use_ssl=SSL)
     bot.runWithCallback(onConnect)

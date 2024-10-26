@@ -6,4 +6,4 @@ A bot for hanb!
 
 ## Usage
 
-Copy `conf.py.example` to `conf.py`, edit it and start `bot.py`.
+Copy `.env.example` to `.env`, edit it and start `bot.py`.
