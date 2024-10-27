@@ -33,7 +33,7 @@ HANB_CMD = os.getenv("HANB_CMD") or "hanb"
 HANB_CMD = os.environ.get("HANB_CMD", HANB_CMD)
 
 utils.setLogging(logging.INFO)
-utils.setParseOrderTopBottom(True)
+utils.setParseOrderTopBottom(False)
 utils.setPrefix(PREFIX)
 
 info = utils.log
@@ -101,6 +101,14 @@ async def readurl(bot: IrcBot, args: re.Match, msg: Message):
         return "Code has been evaluated but i am not going to spam the channel"
     except Exception as e:
         return (msg, "Failed to read paste: " + str(e))
+
+
+@utils.arg_command("reset", "Resets the environment")
+async def reset(bot: IrcBot, args: re.Match, msg: Message):
+    global shell
+    shell.child.close()
+    shell = replwrap.REPLWrapper(HANB_CMD, "hanb>", None)
+    return "Environment has been reset"
 
 
 async def onConnect(bot: IrcBot):
