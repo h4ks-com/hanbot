@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+import tempfile
 from pathlib import Path
 
 import requests
@@ -33,7 +34,7 @@ HANB_CMD = os.getenv("HANB_CMD") or "hanb"
 HANB_CMD = os.environ.get("HANB_CMD", HANB_CMD)
 
 utils.setLogging(logging.INFO)
-utils.setParseOrderTopBottom(False)
+utils.setParseOrderTopBottom(True)
 utils.setPrefix(PREFIX)
 
 info = utils.log
@@ -80,25 +81,14 @@ def run_command(text: str):
     return [convert_ansi_to_irc(m) for m in list(shell.run_command(text, timeout=10).split("\n"))]
 
 
-@utils.regex_cmd_with_messsage(rf"^{PREFIX}(.+)$")
-async def run(bot: IrcBot, match: re.Match, message: Message):
-    text = match.group(1).strip()
-    return run_command(text)
-
-
-@utils.regex_cmd_with_messsage(rf"^{PREFIX}\s*help(.*)$")
-async def run_help(bot: IrcBot, match: re.Match, message: Message):
-    text = "help" + (match.group(1).strip() or "")
-    return run_command(text)
-
-
-@utils.arg_command("read", "Populates your environment code with code from url")
+@utils.arg_command("load", "Populates your environment code with code from url")
 async def readurl(bot: IrcBot, args: re.Match, msg: Message):
     if not args[1]:
         return "Please provide a url"
     try:
-        run_command(read_paste(args[1]))
-        return "Code has been evaluated but i am not going to spam the channel"
+        with tempfile.NamedTemporaryFile() as f:
+            f.write(read_paste(args[1]).encode())
+            return run_command(f"load {f.name}")
     except Exception as e:
         return (msg, "Failed to read paste: " + str(e))
 
@@ -109,6 +99,21 @@ async def reset(bot: IrcBot, args: re.Match, msg: Message):
     shell.child.close()
     shell = replwrap.REPLWrapper(HANB_CMD, "hanb>", None)
     return "Environment has been reset"
+
+
+@utils.regex_cmd_with_messsage(rf"^{PREFIX}(.+)$")
+async def run(bot: IrcBot, match: re.Match, message: Message):
+    text = match.group(1).strip()
+    return run_command(text)
+
+
+@utils.regex_cmd_with_messsage(rf"^{PREFIX}\s*help(.*)$")
+async def run_help(bot: IrcBot, match: re.Match, message: Message):
+    text = "help" + (match.group(1).strip() or "")
+    help = run_command(text)
+    help = [line for line in help if line.strip()]
+    help.extend(["read <url>", readurl.__doc__ or "", "reset", reset.__doc__ or ""])
+    return help
 
 
 async def onConnect(bot: IrcBot):
