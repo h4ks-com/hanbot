@@ -1,4 +1,4 @@
-re-ircbot==1.7.0
+re-ircbot==2.0.16-dev
 pexpect==4.8.0
 requests==2.27.1
 python-dotenv==1.0.1

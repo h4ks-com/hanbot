@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -6,9 +7,9 @@ import tempfile
 from pathlib import Path
 
 import requests
-import trio
 from dotenv import load_dotenv
-from IrcBot.bot import IrcBot, Message, utils
+from ircbot import IrcBot, utils
+from ircbot.message import Message
 from pexpect import replwrap
 
 from shell_convert import convert_ansi_to_irc
@@ -33,9 +34,7 @@ CHANNELS = remove_surrounding_quotes(os.getenv("CHANNELS", "")).split(",")
 HANB_CMD = os.getenv("HANB_CMD") or "hanb"
 HANB_CMD = os.environ.get("HANB_CMD", HANB_CMD)
 
-utils.setLogging(logging.INFO)
-utils.setParseOrderTopBottom(True)
-utils.setPrefix(PREFIX)
+utils.set_loglevel(logging.INFO)
 
 info = utils.log
 
@@ -49,6 +48,11 @@ if not os.path.exists(OUTPUT_DIR):
 os.chdir(OUTPUT_DIR)
 
 shell = replwrap.REPLWrapper(HANB_CMD, "hanb>", None)
+
+bot = IrcBot(HOST, PORT, NICK, use_ssl=SSL, disable_automatic_help=True)
+
+bot.set_prefix(PREFIX)
+bot.set_parser_order(False)
 
 
 def paste(file):
@@ -81,42 +85,51 @@ def run_command(text: str):
     return [convert_ansi_to_irc(m) for m in list(shell.run_command(text, timeout=10).split("\n"))]
 
 
-@utils.arg_command("load", "Populates your environment code with code from url")
-async def readurl(bot: IrcBot, args: re.Match, msg: Message):
+@bot.arg_command("load", "Populates your environment code with code from url")
+async def readurl(args: re.Match, msg: Message):
     if not args[1]:
         return "Please provide a url"
     try:
-        with tempfile.NamedTemporaryFile() as f:
+        with tempfile.NamedTemporaryFile(delete=False) as f:
             f.write(read_paste(args[1]).encode())
-            return run_command(f"load {f.name}")
+        output = run_command(f"load {f.name}")
+        os.unlink(f.name)
+        return output
     except Exception as e:
-        return (msg, "Failed to read paste: " + str(e))
+        return f"Error: {e}"
 
 
-@utils.arg_command("reset", "Resets the environment")
-async def reset(bot: IrcBot, args: re.Match, msg: Message):
+@bot.arg_command("reset", "Resets the environment")
+async def reset(args: re.Match, msg: Message):
     global shell
     shell.child.close()
     shell = replwrap.REPLWrapper(HANB_CMD, "hanb>", None)
     return "Environment has been reset"
 
 
-@utils.regex_cmd_with_messsage(rf"^{PREFIX}(.+)$")
-async def run(bot: IrcBot, match: re.Match, message: Message):
+@bot.regex_cmd_with_message(rf"^{PREFIX}(.+)$")
+async def run(match: re.Match, message: Message):
     text = match.group(1).strip()
     return run_command(text)
 
 
-@utils.regex_cmd_with_messsage(rf"^{PREFIX}\s*help(.*)$")
-async def run_help(bot: IrcBot, match: re.Match, message: Message):
-    text = "help" + (match.group(1).strip() or "")
+@bot.regex_cmd_with_message(rf"^{PREFIX}\s*h(?:elp)?( .*)?$")
+async def run_help(match: re.Match, message: Message):
+    text = "help " + (match.group(1) or "").strip()
     help = run_command(text)
     help = [line for line in help if line.strip()]
-    help.extend(["read <url>", readurl.__doc__ or "", "reset", reset.__doc__ or ""])
+    if match.group(1):
+        return help
+    help.extend(
+        [
+            f"read <url> {bot.commands_help['load'] or ''}",
+            f"reset {bot.commands_help['reset'] or ''}",
+        ]
+    )
     return help
 
 
-async def onConnect(bot: IrcBot):
+async def on_connect():
     for channel in CHANNELS:
         await bot.join(channel)
 
@@ -124,27 +137,22 @@ async def onConnect(bot: IrcBot):
     for channel in CHANNELS:
         await bot.send_message(channel=channel, message=list(shell.child.before.split("\n")))
 
-    async def update_loop():
-        """Update cache to eliminate invalid keys and monitor"""
-        while True:
-            for file in Path("./").glob("*"):
-                info(f"Found {file=}")
-                if not file.is_file():
-                    continue
-                name = file.name
-                url = paste(file)
+    # Update cache to eliminate invalid keys and monitor
+    while True:
+        for file in Path("./").glob("*"):
+            info(f"Found {file=}")
+            if not file.is_file():
+                continue
+            name = file.name
+            url = paste(file)
 
-                # TODO what channel should we send this to?
-                for channel in CHANNELS:
-                    await bot.send_message(f"{name}: {url}", channel)
-                file.unlink()
+            # TODO what channel should we send this to?
+            for channel in CHANNELS:
+                await bot.send_message(f"{name}: {url}", channel)
+            file.unlink()
 
-            await trio.sleep(3)
-
-    async with trio.open_nursery() as nursery:
-        nursery.start_soon(update_loop)
+        await asyncio.sleep(2)
 
 
 if __name__ == "__main__":
-    bot = IrcBot(HOST, PORT, NICK, use_ssl=SSL)
-    bot.runWithCallback(onConnect)
+    bot.run_with_callback(on_connect)
