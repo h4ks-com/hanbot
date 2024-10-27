@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import re
@@ -49,21 +50,28 @@ os.chdir(OUTPUT_DIR)
 shell = replwrap.REPLWrapper(HANB_CMD, "hanb>", None)
 
 
-def paste(text):
-    """Paste text to ix.io."""
-    info(f"Pasting {text=}")
+def paste(file):
+    """Paste text to s.h4ks.com"""
+    filebin = "http://s.h4ks.com"
+    response = requests.post(
+        f"{filebin}/api/",
+        files={"file": open(file, "rb")},
+    )
     try:
-        url = "http://ix.io"
-        payload = {"f:1=<-": text}
-        response = requests.request("POST", url, data=payload)
+        obj = response.json()
+    except json.JSONDecodeError:
+        response.raise_for_status()
         return response.text
-    except Exception as e:
-        info(f"Error {e=}")
-        return "Failed to paste"
+
+    if "url" in obj:
+        return obj["url"]
+    if "error" in obj:
+        return f"error: {obj['error']}"
+    return f"error: {obj}"
 
 
 def read_paste(url):
-    """Read text from ix.io."""
+    """Read text from s.h4ks.com"""
     response = requests.request("GET", url)
     return response.text
 
@@ -111,7 +119,7 @@ async def onConnect(bot: IrcBot):
                 if not file.is_file():
                     continue
                 name = file.name
-                url = paste(file.read_text())
+                url = paste(file)
 
                 # TODO what channel should we send this to?
                 for channel in CHANNELS:
